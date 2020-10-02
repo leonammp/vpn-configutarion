@@ -1,0 +1,61 @@
+#!/bin/bash
+# COLORS
+COLOR_RESET="$(tput sgr0)"
+COLOR_GREEN="$(tput setaf 2)"
+# CHECK IF root
+if [ "$EUID" -ne 0 ]; then
+  printf '%s\n' "Você precisa rodar com privilégio $COLOR_GREEN ROOT $COLOR_RESET"
+  exit
+fi
+# FIRST CONFIGURATION
+CONFIG=`ls -1 /usr/local/bin/vpn 2>/dev/null | wc -l`
+if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
+  FILES_OVPN=`ls -1 ${HOME}/vpn/*.ovpn 2>/dev/null | wc -l`
+  if [[ "FILES_OVPN" -ne 1 ]]; then
+    printf '%s\n' "Voce precisa ter um arquivo com a extensao $COLOR_GREEN .ovpn $COLOR_RESET na pasta ~/vpn/"
+    exit
+  fi
+  printf '%s\n' "$COLOR_GREEN- Inicializando configuracao da VPN...$COLOR_RESET"
+  printf '%s' "Enter username: "
+  read USERNAME  
+  printf '%s' "Enter password: "
+  read -s PASSOWORD
+  printf '\n%s' "Enter secret-key (otp token): "
+  read SECRET_KEY
+  # CREATE FILES TO SAVE CREDENTIALS
+  echo -e "$USERNAME\n$PASSOWORD" > ${HOME}/vpn/config.txt
+  chmod 600 ${HOME}/vpn/config.txt
+  touch ${HOME}/vpn/auth.txt
+  chmod 600 ${HOME}/vpn/auth.txt
+  # CHANGE .ovpn TO USE A FILE IN CREDENTIALS
+  FILE=`ls ${HOME}/vpn/*.ovpn`
+  sed -i "s+.*auth-user-pass.*+auth-user-pass ${HOME}/vpn/auth.txt+" $FILE
+  printf '\n%s' "$COLOR_GREEN- Criando arquivo vpn.py $COLOR_RESET"
+  echo 'import pyotp' > ${HOME}/vpn/vpn.py
+  echo 'import os' >> ${HOME}/vpn/vpn.py
+  echo "base32secret = '$SECRET_KEY'" >> ${HOME}/vpn/vpn.py
+  echo 'totp = pyotp.TOTP(base32secret)' >> ${HOME}/vpn/vpn.py
+  echo 'PATH = str(os.popen("echo ${HOME}/vpn").read())[:-1]' >> ${HOME}/vpn/vpn.py
+  echo 'f = open(f"{PATH}/config.txt", "r")' >> ${HOME}/vpn/vpn.py
+  echo 'auth_text = f.read()' >> ${HOME}/vpn/vpn.py
+  echo 'f.close()' >> ${HOME}/vpn/vpn.py
+  echo 'auth = auth_text[:-1] + totp.now()' >> ${HOME}/vpn/vpn.py
+  echo 'f = open(f"{PATH}/auth.txt", "w")' >> ${HOME}/vpn/vpn.py
+  echo 'f.write(auth)' >> ${HOME}/vpn/vpn.py
+  echo 'f.close()' >> ${HOME}/vpn/vpn.py
+  echo 'os.system("user_vpn=\"$(ls ${HOME}/vpn/*.ovpn)\" && sudo openvpn ${user_vpn}")' >> ${HOME}/vpn/vpn.py
+  printf '\n%s\n' "$COLOR_GREEN- Gerando binario do comando vpn... $COLOR_RESET"
+  echo '#!/bin/bash' > /usr/local/bin/vpn
+  echo 'COLOR_RESET="$(tput sgr0)"' >> /usr/local/bin/vpn
+  echo 'COLOR_GREEN="$(tput setaf 2)"' >> /usr/local/bin/vpn
+  echo 'if [ "$EUID" -ne 0 ]; then' >> /usr/local/bin/vpn
+  echo 'printf "%s\n" "Você precisa rodar com privilégio $COLOR_GREEN ROOT $COLOR_RESET"' >> /usr/local/bin/vpn
+  echo 'exit' >> /usr/local/bin/vpn
+  echo 'fi' >> /usr/local/bin/vpn
+  echo 'python3 ~/vpn/vpn.py' >> /usr/local/bin/vpn
+  chmod +x /usr/local/bin/vpn
+  printf '\n%s\n' "$COLOR_GREEN- Instalando pyotp... $COLOR_RESET"
+  python3 -m pip install pyotp
+fi
+printf '%s\n\n' "$COLOR_GREEN- VPN CONFIGURADA COM SUCESSO!$COLOR_RESET :)"
+printf '%s\n\n' "# Comando para iniciar a VPN: sudo vpn"
