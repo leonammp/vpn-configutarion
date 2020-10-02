@@ -10,7 +10,13 @@ Para encontrar os 6 dígitos do token, precisamos utilizar o <SECRET_KEY>. Entã
 
 ## 1. CONFIGURAÇÃO
 
-Para iniciar a configuração da vpn você deve dar permissão de execução para o arquivo 'config_vpn':
+
+Para iniciar a configuração da VPN, você precisa colocar o seu arquivo de autenticação (**.opvn**) na pasta ~/vpn.
+Comando para criar a pasta:
+```bash
+mkdir ~/vpn
+```
+Se o arquivo **config_vpn** não estiver com permissão de execução:
 ```bash
 chmod +x config_vpn
 ```
