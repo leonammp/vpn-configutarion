@@ -31,15 +31,18 @@ if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
   FILE=`ls ${HOME}/vpn/*.ovpn`
   sed -i "s+.*auth-user-pass.*+auth-user-pass ${HOME}/vpn/auth.txt+" $FILE
   printf '\n%s' "$COLOR_GREEN- Criando arquivo vpn.py $COLOR_RESET"
-  echo 'import pyotp' > ${HOME}/vpn/vpn.py
-  echo 'import os' >> ${HOME}/vpn/vpn.py
-  echo "base32secret = '$SECRET_KEY'" >> ${HOME}/vpn/vpn.py
-  echo 'totp = pyotp.TOTP(base32secret)' >> ${HOME}/vpn/vpn.py
+  echo 'import os' > ${HOME}/vpn/vpn.py
+  echo "secret = '$SECRET_KEY'" >> ${HOME}/vpn/vpn.py
   echo 'PATH = str(os.popen("echo ${HOME}/vpn").read())[:-1]' >> ${HOME}/vpn/vpn.py
   echo 'f = open(f"{PATH}/config.txt", "r")' >> ${HOME}/vpn/vpn.py
   echo 'auth_text = f.read()' >> ${HOME}/vpn/vpn.py
   echo 'f.close()' >> ${HOME}/vpn/vpn.py
-  echo 'auth = auth_text[:-1] + totp.now()' >> ${HOME}/vpn/vpn.py
+  # CHECK IF SECRET IS HEX OR BASE32
+  if ! [[ $SECRET_KEY =~ ^[0-9A-Fa-f]{1,}$ ]] ; then
+      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool -b --totp '{secret}'\").read())[:-1]" >> ${HOME}/vpn/vpn.py
+  else
+      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool --totp '{secret}'\").read())[:-1]" >> ${HOME}/vpn/vpn.py
+  fi
   echo 'f = open(f"{PATH}/auth.txt", "w")' >> ${HOME}/vpn/vpn.py
   echo 'f.write(auth)' >> ${HOME}/vpn/vpn.py
   echo 'f.close()' >> ${HOME}/vpn/vpn.py
@@ -54,8 +57,8 @@ if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
   echo 'fi' >> /usr/local/bin/vpn
   echo 'python3 ~/vpn/vpn.py' >> /usr/local/bin/vpn
   chmod +x /usr/local/bin/vpn
-  printf '\n%s\n' "$COLOR_GREEN- Instalando pyotp... $COLOR_RESET"
-  python3 -m pip install pyotp
+  printf '\n%s\n' "$COLOR_GREEN- Instalando oathtool... $COLOR_RESET"
+  apt install oathtool
 fi
 printf '%s\n\n' "$COLOR_GREEN- VPN CONFIGURADA COM SUCESSO!$COLOR_RESET :)"
 printf '%s\n\n' "# Comando para iniciar a VPN: sudo vpn"
