@@ -7,12 +7,16 @@ if [ "$EUID" -ne 0 ]; then
   printf '%s\n' "Você precisa rodar com privilégio $COLOR_GREEN ROOT $COLOR_RESET"
   exit
 fi
+
+printf '%s' "Enter path to config vpn (/home/user_example): "
+read PATH_CONFIG
+
 # FIRST CONFIGURATION
 CONFIG=`ls -1 /usr/local/bin/vpn 2>/dev/null | wc -l`
 if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
-  FILES_OVPN=`ls -1 ${HOME}/vpn/*.ovpn 2>/dev/null | wc -l`
+  FILES_OVPN=`ls -1 ${PATH_CONFIG}/vpn/*.ovpn 2>/dev/null | wc -l`
   if [[ "FILES_OVPN" -ne 1 ]]; then
-    printf '%s\n' "Voce precisa ter um arquivo com a extensao $COLOR_GREEN .ovpn $COLOR_RESET na pasta ~/vpn/"
+    printf '%s\n' " [$FILES_OVPN] Voce precisa ter um arquivo com a extensao $COLOR_GREEN .ovpn $COLOR_RESET na pasta ~/vpn/"
     exit
   fi
   printf '%s\n' "$COLOR_GREEN- Inicializando configuracao da VPN...$COLOR_RESET"
@@ -23,30 +27,30 @@ if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
   printf '\n%s' "Enter secret-key (otp token): "
   read SECRET_KEY
   # CREATE FILES TO SAVE CREDENTIALS
-  echo -e "$USERNAME\n$PASSOWORD" > ${HOME}/vpn/config.txt
-  chmod 600 ${HOME}/vpn/config.txt
-  touch ${HOME}/vpn/auth.txt
-  chmod 600 ${HOME}/vpn/auth.txt
+  echo -e "$USERNAME\n$PASSOWORD" > ${PATH_CONFIG}/vpn/config.txt
+  chmod 600 ${PATH_CONFIG}/vpn/config.txt
+  touch ${PATH_CONFIG}/vpn/auth.txt
+  chmod 600 ${PATH_CONFIG}/vpn/auth.txt
   # CHANGE .ovpn TO USE A FILE IN CREDENTIALS
-  FILE=`ls ${HOME}/vpn/*.ovpn`
-  sed -i "s+.*auth-user-pass.*+auth-user-pass ${HOME}/vpn/auth.txt+" $FILE
+  FILE=`ls ${PATH_CONFIG}/vpn/*.ovpn`
+  sed -i "s+.*auth-user-pass.*+auth-user-pass ${PATH_CONFIG}/vpn/auth.txt+" $FILE
   printf '\n%s' "$COLOR_GREEN- Criando arquivo vpn.py $COLOR_RESET"
-  echo 'import os' > ${HOME}/vpn/vpn.py
-  echo "secret = '$SECRET_KEY'" >> ${HOME}/vpn/vpn.py
-  echo 'PATH = str(os.popen("echo ${HOME}/vpn").read())[:-1]' >> ${HOME}/vpn/vpn.py
-  echo 'f = open(f"{PATH}/config.txt", "r")' >> ${HOME}/vpn/vpn.py
-  echo 'auth_text = f.read()' >> ${HOME}/vpn/vpn.py
-  echo 'f.close()' >> ${HOME}/vpn/vpn.py
+  echo 'import os' > ${PATH_CONFIG}/vpn/vpn.py
+  echo "secret = '$SECRET_KEY'" >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'PATH = str(os.popen("echo '${PATH_CONFIG}'/vpn").read())[:-1]' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'f = open(f"{PATH}/config.txt", "r")' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'auth_text = f.read()' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'f.close()' >> ${PATH_CONFIG}/vpn/vpn.py
   # CHECK IF SECRET IS HEX OR BASE32
   if ! [[ $SECRET_KEY =~ ^[0-9A-Fa-f]{1,}$ ]] ; then
-      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool -b --totp '{secret}'\").read())[:-1]" >> ${HOME}/vpn/vpn.py
+      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool -b --totp '{secret}'\").read())[:-1]" >> ${PATH_CONFIG}/vpn/vpn.py
   else
-      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool --totp '{secret}'\").read())[:-1]" >> ${HOME}/vpn/vpn.py
+      echo "auth = auth_text[:-1] + str(os.popen(f\"oathtool --totp '{secret}'\").read())[:-1]" >> ${PATH_CONFIG}/vpn/vpn.py
   fi
-  echo 'f = open(f"{PATH}/auth.txt", "w")' >> ${HOME}/vpn/vpn.py
-  echo 'f.write(auth)' >> ${HOME}/vpn/vpn.py
-  echo 'f.close()' >> ${HOME}/vpn/vpn.py
-  echo 'os.system("user_vpn=\"$(ls ${HOME}/vpn/*.ovpn)\" && sudo openvpn ${user_vpn}")' >> ${HOME}/vpn/vpn.py
+  echo 'f = open(f"{PATH}/auth.txt", "w")' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'f.write(auth)' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'f.close()' >> ${PATH_CONFIG}/vpn/vpn.py
+  echo 'os.system("user_vpn=\"$(ls '${PATH_CONFIG}'/vpn/*.ovpn)\" && sudo openvpn ${user_vpn}")' >> ${PATH_CONFIG}/vpn/vpn.py
   printf '\n%s\n' "$COLOR_GREEN- Gerando binario do comando vpn... $COLOR_RESET"
   echo '#!/bin/bash' > /usr/local/bin/vpn
   echo 'COLOR_RESET="$(tput sgr0)"' >> /usr/local/bin/vpn
@@ -55,7 +59,7 @@ if [ "$1" = "--config" ] || [ "$CONFIG" -ne 1 ]; then
   echo 'printf "%s\n" "Você precisa rodar com privilégio $COLOR_GREEN ROOT $COLOR_RESET"' >> /usr/local/bin/vpn
   echo 'exit' >> /usr/local/bin/vpn
   echo 'fi' >> /usr/local/bin/vpn
-  echo 'python3 ~/vpn/vpn.py' >> /usr/local/bin/vpn
+  echo 'python3 '${PATH_CONFIG}'/vpn/vpn.py' >> /usr/local/bin/vpn
   chmod +x /usr/local/bin/vpn
   printf '\n%s\n' "$COLOR_GREEN- Instalando oathtool... $COLOR_RESET"
   apt install oathtool
